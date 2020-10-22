@@ -81,7 +81,7 @@ async def text_to_speech(message, content):
             vc = bot_channels[0]
         
         # await message.channel.send(f"Saying what {ctx.message.author.name} told me to say.")
-        vc.play(discord.FFmpegPCMAudio(executable="../random/ffmpeg/bin/ffmpeg.exe", source="./playing.mp3"))
+        vc.play(discord.FFmpegPCMAudio(executable="./ffmpeg/bin/ffmpeg.exe", source="./playing.mp3"))
         
         # Sleep while audio is playing.
         while vc.is_playing():
