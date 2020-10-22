@@ -81,7 +81,7 @@ async def text_to_speech(message, content):
             vc = bot_channels[0]
         
         # await message.channel.send(f"Saying what {ctx.message.author.name} told me to say.")
-        vc.play(discord.FFmpegPCMAudio(executable="../random/ffmpeg/bin/ffmpeg.exe", source="./playing.mp3"))
+        vc.play(discord.FFmpegPCMAudio(executable="./ffmpeg/bin/ffmpeg.exe", source="./playing.mp3"))
         
         # Sleep while audio is playing.
         while vc.is_playing():
@@ -92,7 +92,7 @@ async def text_to_speech(message, content):
         await message.channel.send("You are not in a voice channel.")
     # Delete command after the audio is done playing.
     
-    os.system("rm playing.mp3")
+    # os.system("rm playing.mp3")
 
 tts_help_string = "Text to speech.\nYou can also use it in the following ways:\n=say Hello there\n= Hello there\nsay Hello there\nIf you are muted, it will speak whatever you type."
 
@@ -104,13 +104,14 @@ async def tts(ctx, *args):
 
 @bot.listen('on_message')
 async def talk_it(message):
-    b = message.author.voice.mute or message.author.voice.self_mute
-
+    m = message.author.voice.mute or message.author.voice.self_mute
+    d = message.author.voice.deaf or message.author.voice.self_deaf
+    
     invoke_com = 'say'
     if (message.content.split(' '))[0] == invoke_com:
         await text_to_speech(message, message.content[len(invoke_com)+1:])
 
-    elif b and len(message.content) < threshold and message.content[0] != '=':
+    elif m and not d and len(message.content) < threshold and message.content[0] != '=':
         await text_to_speech(message, message.content)
 
 
