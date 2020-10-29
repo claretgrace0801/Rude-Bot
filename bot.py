@@ -1,29 +1,43 @@
 # bot.py
 import os
 import random
-import pyttsx3
-import discord
-from discord.ext import commands
-from dotenv import load_dotenv
-from time import sleep
 
-engine = pyttsx3.init() # object creation
+try:
+    # import pyttsx3
+    from gtts import gTTS
+    import discord
+    from discord.ext import commands
+    from dotenv import load_dotenv
+    from time import sleep
+except:
+    # os.system("pip3 install pyttsx3")
+    os.system("pip3 install discord.py")
+    os.system("pip3 install discord.py[voice]")
+    os.system("pip3 install python-dotenv")
+    os.system("pip3 install gTTS")
+    import pyttsx3
+    import discord
+    from discord.ext import commands
+    from dotenv import load_dotenv
+    from time import sleep
 
-""" RATE"""
-rate = engine.getProperty('rate')   # getting details of current speaking rate
-print (rate)                        #printing current voice rate
-engine.setProperty('rate', 125)     # setting up new voice rate
+# engine = pyttsx3.init() # object creation
+
+# """ RATE"""
+# rate = engine.getProperty('rate')   # getting details of current speaking rate
+# print (rate)                        #printing current voice rate
+# engine.setProperty('rate', 125)     # setting up new voice rate
 
 
-"""VOLUME"""
-volume = engine.getProperty('volume')   #getting to know current volume level (min=0 and max=1)
-print (volume)                          #printing current volume level
-engine.setProperty('volume',1.0)    # setting up volume level  between 0 and 1
+# """VOLUME"""
+# volume = engine.getProperty('volume')   #getting to know current volume level (min=0 and max=1)
+# print (volume)                          #printing current volume level
+# engine.setProperty('volume',1.0)    # setting up volume level  between 0 and 1
 
-"""VOICE"""
-voices = engine.getProperty('voices')       #getting details of current voice
-#engine.setProperty('voice', voices[0].id)  #changing index, changes voices. o for male
-engine.setProperty('voice', voices[1].id)   #changing index, changes voices. 1 for female
+# """VOICE"""
+# voices = engine.getProperty('voices')       #getting details of current voice
+# #engine.setProperty('voice', voices[0].id)  #changing index, changes voices. o for male
+# engine.setProperty('voice', voices[1].id)   #changing index, changes voices. 1 for female
 
 
 print("CONNECTED")
@@ -62,9 +76,11 @@ async def talk_rude(ctx):
     await ctx.send(response)
 
 async def text_to_speech(message, content):
-    engine.save_to_file(content, 'playing.mp3')
-    engine.runAndWait()
-    engine.stop()
+    # engine.save_to_file(content, 'playing.wav')
+    # engine.runAndWait()
+    # engine.stop()
+    tts_var = gTTS(content, lang_check=False)
+    tts_var.save('playing.wav')
     bot_channels = bot.voice_clients
     voice_channel = message.author.voice
     # print(voice_channel)  
@@ -81,7 +97,7 @@ async def text_to_speech(message, content):
             vc = bot_channels[0]
         
         # await message.channel.send(f"Saying what {ctx.message.author.name} told me to say.")
-        vc.play(discord.FFmpegPCMAudio(executable="./ffmpeg/bin/ffmpeg.exe", source="./playing.mp3"))
+        vc.play(discord.FFmpegPCMAudio("./playing.wav"))
         
         # Sleep while audio is playing.
         while vc.is_playing():
@@ -115,18 +131,18 @@ async def talk_it(message):
         await text_to_speech(message, message.content)
 
 
-@bot.command(name='voice', help='Set a voice for text to speech.\nAvailable voices: David, Zira')
-async def voi(ctx, arg):
-    voice_names = [voice.name.split(' ')[1] for voice in voices]
-    if arg in voice_names:
-        vid = ''
-        for voice in voices:
-            if voice.name.split(' ')[1] == arg:
-                vid = voice.id
-        engine.setProperty('voice', vid)
-        await ctx.send(f"Voice set to {arg}")
-    else:
-        await ctx.send(f"{arg} is not an option")
+# @bot.command(name='voice', help='Set a voice for text to speech.\nAvailable voices: David, Zira')
+# async def voi(ctx, arg):
+#     voice_names = [voice.name.split(' ')[1] for voice in voices]
+#     if arg in voice_names:
+#         vid = ''
+#         for voice in voices:
+#             if voice.name.split(' ')[1] == arg:
+#                 vid = voice.id
+#         # engine.setProperty('voice', vid)
+#         await ctx.send(f"Voice set to {arg}")
+#     else:
+#         await ctx.send(f"{arg} is not an option")
 
 # @bot.command(name='mute-speech', help='Set to true/false\nSet to True if you want every message to be spoken out while you are muted.')
 # async def mspeech(ctx, arg):
