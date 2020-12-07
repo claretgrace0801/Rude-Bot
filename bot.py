@@ -1,65 +1,75 @@
 # bot.py
 import os
 import random
+import sys
+import asyncio
+import time
 
-try:
-    # import pyttsx3
-    from gtts import gTTS
-    import discord
-    from discord.ext import commands
-    from dotenv import load_dotenv
-    from time import sleep
-except:
-    # os.system("pip3 install pyttsx3")
-    os.system("pip3 install discord.py")
-    os.system("pip3 install discord.py[voice]")
-    os.system("pip3 install python-dotenv")
-    os.system("pip3 install gTTS")
-    import pyttsx3
-    import discord
-    from discord.ext import commands
-    from dotenv import load_dotenv
-    from time import sleep
+from gtts import gTTS
+import discord
+from discord.ext import commands,tasks
+from dotenv import load_dotenv
+from time import sleep
+from discord import opus
 
-# engine = pyttsx3.init() # object creation
-
-# """ RATE"""
-# rate = engine.getProperty('rate')   # getting details of current speaking rate
-# print (rate)                        #printing current voice rate
-# engine.setProperty('rate', 125)     # setting up new voice rate
-
-
-# """VOLUME"""
-# volume = engine.getProperty('volume')   #getting to know current volume level (min=0 and max=1)
-# print (volume)                          #printing current volume level
-# engine.setProperty('volume',1.0)    # setting up volume level  between 0 and 1
-
-# """VOICE"""
-# voices = engine.getProperty('voices')       #getting details of current voice
-# #engine.setProperty('voice', voices[0].id)  #changing index, changes voices. o for male
-# engine.setProperty('voice', voices[1].id)   #changing index, changes voices. 1 for female
-
-
-print("CONNECTED")
 load_dotenv()
 TOKEN = os.getenv('DISCORD_TOKEN')
 
-bot = commands.Bot(command_prefix='=')
+intents = discord.Intents.all()
+bot = commands.Bot(command_prefix='=', intents=intents)
 
+#global variables
 threshold = 400
-# mute_toggles ={}
-# for guild in bot.guilds:
-#     for member in guild.members:
-#         mute_toggles[member] = True
+minutes = 5
 
-# for voice in voices: 
-#     # to get the info. about various voices in our PC  
-#     print("Voice:") 
-#     print("ID: %s" %voice.id) 
-#     print("Name: %s" %voice.name) 
-#     print("Age: %s" %voice.age) 
-#     print("Gender: %s" %voice.gender) 
-#     print("Languages Known: %s" %voice.languages) 
+mute_toggles = {}
+active_time = {}
+
+async def check_inactivity():
+    # print(time.time())
+    bot_channels = bot.voice_clients
+    # print(bot_channels)
+    t = time.time()
+    sec = minutes*60
+    for vc in bot_channels:
+        if (t - active_time[vc.guild.id]) > sec:
+            await vc.disconnect() 
+
+async def check_often():
+    while True:
+        # print(time.time())
+        await check_inactivity()
+        await asyncio.sleep(minutes*60)
+
+async def update_toggles():
+    global mute_toggles
+    for guild in bot.guilds:
+        for member in guild.members:
+            if member.id not in mute_toggles:
+                mute_toggles[member.id] = False
+
+async def update_active_time():
+    global active_time
+    for guild in bot.guilds:
+        if guild.id not in active_time:
+            active_time[guild.id] = 0.0
+
+@bot.listen('on_ready')
+async def initialisation():
+    await update_toggles()
+    await update_active_time()
+    # print(mute_toggles)
+    print("CONNECTED")
+
+@bot.listen('on_guild_join')
+async def guild_join():
+    # update mute toggles
+    await update_toggles()
+    await update_active_time()
+
+@bot.listen('on_member_join')
+async def mem_join():
+    await update_toggles()
 
 @bot.command(name='rude', help="Don't do this. The bot will insult you.")
 async def talk_rude(ctx):
@@ -76,28 +86,38 @@ async def talk_rude(ctx):
     await ctx.send(response)
 
 async def text_to_speech(message, content):
-    # engine.save_to_file(content, 'playing.wav')
-    # engine.runAndWait()
-    # engine.stop()
+    global active_time
+    active_time[message.guild.id] = time.time()
+    if len(content) > 400:
+        return
+    # tts_engine = tts.sapi.Sapi()
+    # tts_engine.create_recording("playing.wav", content)
     tts_var = gTTS(content, lang_check=False)
-    tts_var.save('playing.wav')
+    tts_var.save('playing.mp3')
+
     bot_channels = bot.voice_clients
-    voice_channel = message.author.voice
-    # print(voice_channel)  
-    if voice_channel != None:
+    voice_c = message.author.voice
+
+    if voice_c != None:
         vc = None
-        # await message.channel.send(f"Hi {vc}")
-        voice_channel = voice_channel.channel
-        if len(bot_channels) == 0:
-            vc = await voice_channel.connect()
-        elif voice_channel != bot_channels[0].channel:
-            await bot_channels[0].disconnect()
-            vc = await voice_channel.connect()
+        voice_channel = voice_c.channel
+        bot_channels_channels = [channel.channel for channel in bot_channels]
+        print(bot_channels_channels)
+        if voice_channel not in bot_channels_channels:
+            try:
+                vc = await voice_channel.connect()
+            except:
+                chan = [val for val in bot_channels if val.channel in message.guild.voice_channels][0]
+                await chan.disconnect()
+                vc = await voice_channel.connect()
+        # elif voice_channel != bot_channels[0].channel:
+            # await bot_channels[0].disconnect()
+            # vc = await voice_channel.connect()
         else:
-            vc = bot_channels[0]
+            vc = [val for val in bot_channels if val.channel in message.guild.voice_channels][0]
         
         # await message.channel.send(f"Saying what {ctx.message.author.name} told me to say.")
-        vc.play(discord.FFmpegPCMAudio("./playing.wav"))
+        vc.play(discord.FFmpegPCMAudio("./playing.mp3"))
         
         # Sleep while audio is playing.
         while vc.is_playing():
@@ -120,6 +140,7 @@ async def tts(ctx, *args):
 
 @bot.listen('on_message')
 async def talk_it(message):
+    # global mute_toggles
     m = message.author.voice.mute or message.author.voice.self_mute
     d = message.author.voice.deaf or message.author.voice.self_deaf
     
@@ -127,42 +148,25 @@ async def talk_it(message):
     if (message.content.split(' '))[0] == invoke_com:
         await text_to_speech(message, message.content[len(invoke_com)+1:])
 
-    elif m and not d and len(message.content) < threshold and message.content[0] != '=':
+    elif m and not d and len(message.content) < threshold and message.content[0] != '=' and mute_toggles[message.author.id]:
         await text_to_speech(message, message.content)
+    # elif m and not d and len(message.content) < threshold and message.content[0] != '=':
+    #     await text_to_speech(message, message.content)
 
 
-# @bot.command(name='voice', help='Set a voice for text to speech.\nAvailable voices: David, Zira')
-# async def voi(ctx, arg):
-#     voice_names = [voice.name.split(' ')[1] for voice in voices]
-#     if arg in voice_names:
-#         vid = ''
-#         for voice in voices:
-#             if voice.name.split(' ')[1] == arg:
-#                 vid = voice.id
-#         # engine.setProperty('voice', vid)
-#         await ctx.send(f"Voice set to {arg}")
-#     else:
-#         await ctx.send(f"{arg} is not an option")
+@bot.command(name='auto', help='Set to true/false to enable/disable mute-speech\nSet to True if you want every message to be spoken out while you are muted.')
+async def mspeech(ctx, arg):
+    global mute_toggles
+    if arg == 'true' or arg == 'True':
+        mute_toggles[ctx.message.author.id] = True
+        await ctx.send(f"Mute speech is on for {ctx.message.author.name}.")
+    elif arg == 'false' or arg == 'False':
+        mute_toggles[ctx.message.author.id] = False
+        await ctx.send(f"Mute speech is off for {ctx.message.author.name}.")
+    else:
+        await ctx.send(f"{arg} is not a valid option")
 
-# @bot.command(name='mute-speech', help='Set to true/false\nSet to True if you want every message to be spoken out while you are muted.')
-# async def mspeech(ctx, arg):
-#     if arg == 'true':
-#         mute_toggles[ctx.message.author] = True
-#         ctx.send(f"Mute speech is on.")
-#     elif arg == 'false':
-#         mute_toggles[ctx.message.author] = False
-#         ctx.send(f"Mute speech is off.")
-#     else:
-#         ctx.send(f"{arg} is not a valid option")
-
-# @bot.command(name='show-voices', help='List available voices')
-# async def voice(ctx):
-#     display_text = "```"
-#     for voice in voices:
-#         display_text += f"\n{voice.name.split(' ')[1]}"
-#     display_text += "```"
-#     await ctx.send(display_text)
-
+bot.loop.create_task(check_often())
 bot.run(TOKEN)
 
 
